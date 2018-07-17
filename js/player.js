@@ -27,13 +27,24 @@ var player = function (name) {
 
     this.selectUnit = function (unit) {
         this.selectedUnits = [unit];
+        unit.select();
     }
 
     this.addSelectedUnit = function (unit) {
         this.selectedUnits.push(unit);
+        unit.select();
     }
 
     this.clearSelectedUnits = function () {
+        for (var i = 0; i < this.selectedUnits.length; i++) {
+            // console.log("deselecting unit:");
+            // console.log(this.selectedUnits[i]);
+            // console.log(this.selectedUnits[i]['selected']);
+            this.selectedUnits[i].deselect();
+            // console.log("now deselected:");
+            // console.log(this.selectedUnits[i]);
+            // console.log(this.selectedUnits[i]['selected']);
+        }
         this.selectedUnits = [];
     }
 

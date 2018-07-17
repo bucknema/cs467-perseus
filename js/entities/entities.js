@@ -17,6 +17,9 @@ game.Unit = me.Entity.extend({
 
         this._super(me.Entity, 'init', [x, y, settings]);
 
+        this.selected = false;
+        this.selectedBox = null;
+
         // Nathan: Below is just for manual testing and will be removed next
         // week / fixed so units have player owners
         this.player = game.data.player1;
@@ -28,9 +31,55 @@ game.Unit = me.Entity.extend({
         me.input.registerPointerEvent("pointerdown", this, this.pointerDown.bind(this));
     },
 
-    /** Sets the unit as the selected unit for the player */
+    /**
+     * Select single unit with a click; holding shift adds multiple units
+     * to selection.
+     */
     pointerDown: function () {
-        this.player.selectUnit(this);
+        if (me.input.isKeyPressed("shift")) {
+            this.player.addSelectedUnit(this);
+        } else {
+            this.player.selectUnit(this);
+        }
+        this.selected = true;
         return false;
+    },
+
+    update: function () {
+        if (this.selected) {
+            if (!this.selectedBox) {
+                pos = this.getBounds().pos;
+                this.selectedBox = me.game.world.addChild(me.pool.pull("selectedShape", pos.x, pos.y), 2);
+                return true;
+            }
+        } else {
+            if (this.selectedBox) {
+                me.game.world.removeChild(this.selectedBox);
+                this.selectedBox = null;
+                return true;
+            }
+        }
+        return false;
+    },
+
+    deselect: function () {
+        this.selected = false;
+    },
+
+    select: function () {
+        this.selected = true;
     }
+
+});
+
+
+/**
+ * Shape indicating a unit has been selected
+ */
+game.selectedShape = me.Sprite.extend({
+    init: function (x, y) {
+        this._super(me.Sprite, 'init', [x, y, { image: me.loader.getImage('select') }]);
+        this.translate(16, 52);
+    },
+
 });

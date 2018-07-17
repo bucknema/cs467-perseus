@@ -4,44 +4,25 @@ game.PlayScreen = me.ScreenObject.extend({
      */
     onResetEvent: function () {
 
-        // Bind keys for scrolling the map
-        me.input.bindKey(me.input.KEY.LEFT, "left");
-        me.input.bindKey(me.input.KEY.A, "left");
-        me.input.bindKey(me.input.KEY.RIGHT, "right");
-        me.input.bindKey(me.input.KEY.D, "right");
-        me.input.bindKey(me.input.KEY.UP, "up");
-        me.input.bindKey(me.input.KEY.W, "up");
-        me.input.bindKey(me.input.KEY.DOWN, "down");
-        me.input.bindKey(me.input.KEY.S, "down");
-
-        // Register for pointer events
-        me.input.registerPointerEvent("pointerdown", me.game.viewport,
-            function (event) {
-                me.event.publish("pointerclick", [event]);
-            }, false);
-        me.input.registerPointerEvent("pointerup", me.game.viewport,
-            function (event) {
-                me.event.publish("pointerclick", [event]);
-            }, false);
-        me.input.registerPointerEvent("pointermove", me.game.viewport,
-            function (event) {
-                me.event.publish("pointermove", [event]);
-            }, false);
+        // Define how many pixels to pan for all panning functions
+        const AMOUNT_TO_PAN = 10;
 
         // load a level
-        me.levelDirector.loadLevel("level1");
+        me.levelDirector.loadLevel("128x64");
 
-        // Add invisible entity for panning the levle
+        // Add invisible renderable for panning the level
         me.game.world.addChild(new (me.Renderable.extend({
-
             init: function () {
                 this._super(me.Renderable, 'init', [0, 0, 0, 0]);
                 this.alwaysUpdate = true;
+
+                // viewport height/width for brevity
+                this.vpWidth = me.game.viewport.getWidth();
+                this.vpHeight = me.game.viewport.getHeight();
             },
 
             // Pan the camera when WASD/left down up right pressed
             update: function () {
-                const AMOUNT_TO_PAN = 5;
                 var panned = false;
                 if (me.input.isKeyPressed("left")) {
                     me.game.viewport.move(-AMOUNT_TO_PAN, 0);
@@ -50,10 +31,10 @@ game.PlayScreen = me.ScreenObject.extend({
                     me.game.viewport.move(AMOUNT_TO_PAN, 0);
                     panned = true;
                 } else if (me.input.isKeyPressed("up")) {
-                    me.game.viewport.move(0, AMOUNT_TO_PAN);
+                    me.game.viewport.move(0, -AMOUNT_TO_PAN);
                     panned = true;
                 } else if (me.input.isKeyPressed("down")) {
-                    me.game.viewport.move(0, -AMOUNT_TO_PAN);
+                    me.game.viewport.move(0, AMOUNT_TO_PAN);
                     panned = true;
                 }
 
@@ -61,9 +42,11 @@ game.PlayScreen = me.ScreenObject.extend({
             }
         })));
 
-        // add unit selecting rectangle
-        // adapted from:
-        // https://github.com/melonjs/melonJS/blob/master/examples/isometric_rpg/js/screens/play.js
+        /**
+         * Unit-selection box drawn by clicking mouse and dragging, then
+         * releasing mouse. Adapted)-ish) from:
+         * https://github.com/melonjs/melonJS/blob/master/examples/isometric_rpg/js/screens/play.js
+         */
         me.game.world.addChild(new (me.Renderable.extend({
 
             init: function () {
@@ -74,6 +57,9 @@ game.PlayScreen = me.ScreenObject.extend({
                 this.anchorPoint.set(0, 0);
                 this.polyPoints = [];  // array of polygon points to draw
                 this.selectBox = this.clone().toPolygon().toIso();
+                this.startSelection = false;
+                this.finalDraw = false;
+                this.player = game.data.player1;
 
                 // Subscribe to pointerclick and pointermove events
                 this.pointerClickEvent = me.event.subscribe("pointerclick",
@@ -90,12 +76,16 @@ game.PlayScreen = me.ScreenObject.extend({
              * player units are in the rectangle and select them if so.
              */
             pointerClick: function (event) {
-                player = game.data.player1;
+
+                if (me.input.isKeyPressed("shift")) {
+                    return;
+                }
 
                 if (event.type === "pointerdown") {
                     this.polyPoints = [];
-                    player.clearSelectedUnits();
+                    this.player.clearSelectedUnits();
                     this.polyPoints.push(new me.Vector2d(event.gameScreenX, event.gameScreenY));
+                    this.startSelection = true;
                 }
 
                 if (event.type === "pointerup") {
@@ -105,19 +95,24 @@ game.PlayScreen = me.ScreenObject.extend({
                     this.polyPoints.push(new me.Vector2d(event.gameScreenX, this.polyPoints[0].y));
 
                     // Selects player units
-                    units = player.getUnits();
+                    units = this.player.getUnits();
                     for (var i = 0; i < units.length; i++) {
                         unit = units[i];
                         if (unit.pos) {  // this if statement will be removed next week
-                            if (this.selectBox.containsPoint(unit.pos._x, unit.pos._y)) {
-                                player.addSelectedUnit(unit);
+                            pos = me.game.viewport.worldToLocal(unit.pos._x, unit.pos._y);
+                            if (this.selectBox.containsPoint(pos.x, pos.y)) {
+                                this.player.addSelectedUnit(unit);
                             }
                         }
                     }
 
                     // Reset the rectangle coordinates to remove the selectbox
                     this.polyPoints = [];
+                    this.startSelection = false;
+                    this.finalDraw = true;
                 }
+
+                return false;
             },
 
             /** Callback to draw the rectangle as the mouse moves;
@@ -135,7 +130,11 @@ game.PlayScreen = me.ScreenObject.extend({
             /** Update function: always returns true to draw the select box
              * while dragging */
             update: function () {
-                return true;
+                if (this.finalDraw) {
+                    this.finalDraw = false;
+                    return true;
+                }
+                return this.startSelection;
             },
 
             /** Function to render a white rectangle */
@@ -152,12 +151,44 @@ game.PlayScreen = me.ScreenObject.extend({
 
         })));
 
+        // Bind keys for scrolling the map
+        me.input.bindKey(me.input.KEY.LEFT, "left");
+        me.input.bindKey(me.input.KEY.A, "left");
+        me.input.bindKey(me.input.KEY.RIGHT, "right");
+        me.input.bindKey(me.input.KEY.D, "right");
+        me.input.bindKey(me.input.KEY.UP, "up");
+        me.input.bindKey(me.input.KEY.W, "up");
+        me.input.bindKey(me.input.KEY.DOWN, "down");
+        me.input.bindKey(me.input.KEY.S, "down");
+
+        // Bind shift key for multi-selecting units with click
+        me.input.bindKey(me.input.KEY.SHIFT, "shift");
+
+        // Register for pointer events
+        me.input.registerPointerEvent("pointerdown", me.game.viewport,
+            function (event) {
+                me.event.publish("pointerclick", [event]);
+            }, false);
+        me.input.registerPointerEvent("pointerup", me.game.viewport,
+            function (event) {
+                me.event.publish("pointerclick", [event]);
+            }, false);
+        me.input.registerPointerEvent("pointermove", me.game.viewport,
+            function (event) {
+                me.event.publish("pointermove", [event]);
+            }, false);
+
         // Nathan: this is me manually testing some player functions
         // and will be removed next week.
-        var player1 = game.data.player1;
-        player1.buyUnit("testUnit");
-        player1.buyUnit("testUnit");
-        player1.buyUnit("testUnit");
+        game.data.player1.buyUnit("testUnit");
+        game.data.player1.buyUnit("testUnit");
+        game.data.player1.buyUnit("testUnit");
+
+        // Add the enemy AI controller
+        me.game.world.addChild(new game.AI(game.data.enemy, game.data.difficulty));
+
+        // Sylvan: temp adding an AI unit so I can test its logic. Nothing rendered on screen
+        me.game.world.addChild(new game.EnemyUnit(0,0, {width: 10, height: 10}));
     },
 
     /**

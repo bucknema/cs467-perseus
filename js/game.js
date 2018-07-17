@@ -11,13 +11,14 @@ var game = {
         // selecting units, etc. Not technically an entity since
         // we're not rendering it.
         player1: new player("Player 1"),
-        difficulty : "Easy",
+        enemy: new player("Enemy"),
+        difficulty: "Easy",
     },
 
     // Run on page load.
-    onload : function () {
+    onload: function () {
         // Initialize the video.
-        if (!me.video.init(1920, 1200, {wrapper : "screen", scale : "auto"})) {
+        if (!me.video.init(1920, 1200, { wrapper: "screen", scale: "auto", scaleMethod: "fill-max" })) {
             alert("Your browser does not support HTML5 canvas.");
             return;
         }
@@ -33,19 +34,21 @@ var game = {
     },
 
     // Run on game resources loaded.
-    loaded : function () {
+    loaded: function () {
 
         game.texture = new me.video.renderer.Texture(
             me.loader.getJSON("gui"),
             me.loader.getImage("gui")
-            );
+        );
 
         me.state.set(me.state.MENU, new game.TitleScreen());
         me.state.set(me.state.PLAY, new game.PlayScreen());
 
 
         // set a global fading transition for the screen
-        me.state.transition("fade", "#000000", 250);
+        me.state.transition("fade", "#000000", 180);
+
+        me.pool.register("selectedShape", game.selectedShape, true);
 
         // Nathan: I am using these two manually-added test units
         // for the select box testing right now. Will be modified
@@ -53,9 +56,16 @@ var game = {
         me.pool.register("testUnit1", game.Unit);
         me.pool.register("testUnit2", game.Unit);
 
+        //Mark: trying to add some of the wargame art as test units, seeing how they all look on the larger map 128x64
+        me.pool.register("civilian1", game.Unit);
+        me.pool.register("civilian2", game.Unit);
+        me.pool.register("infantry1", game.Unit);
+        me.pool.register("infantry2", game.Unit);
+
+
         // Start the game.
-      //  me.state.change(me.state.PLAY);
-      me.state.change(me.state.MENU);
+        //  me.state.change(me.state.PLAY);
+        me.state.change(me.state.MENU);
 
     }
 };
